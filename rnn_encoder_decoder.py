@@ -12,7 +12,7 @@ Implements the RNN encoder-decoder framework from Cho et al.
 class RNNED(object):
   """ RNN encoder-decoder """
 
-  def __init__(self, nh, nc, ne, de, cs):
+  def __init__(self, nh, nc, ne, de):
     """
     Hyperparameters used for initialization
     nh : dimension of the hidden layer
