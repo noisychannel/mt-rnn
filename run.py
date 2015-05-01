@@ -58,7 +58,6 @@ def readWordVectors(vectorBin, vocab, dim):
   # Now create the embedding matrix
   # TODO:What is the shape
   embeddings = np.empty((len(vocab), dim))
-  #embeddings = {}
   # Embedding for the unknown symbol
   unk = np.ones((dim))
   # We don't want to count the explicit UNK as an unknown
@@ -117,17 +116,10 @@ def getPhrasePairs(tTable, sVocab, tVocab, sEmbeddings, tEmbeddings):
     line = line.strip().split("|||")
     sPhrase = np.asarray([sVocab.get(w, 0) for w in line[0].strip().split()]).astype('int')
     tPhrase = np.asarray([tVocab.get(w, 0) for w in line[1].strip().split()]).astype('int')
-    #sPhrase = [sVocab.get(w, 0) for w in line[0].strip().split()]
-    #tPhrase = [tVocab.get(w, 0) for w in line[1].strip().split()]
     # Don't include phrases that contain only OOVs
     if np.sum(sPhrase) == 0 or np.sum(tPhrase) == 0:
       continue
-    #print line
-    #print sEmbeddings[np.asarray(sPhrase).astype('int')] == np.asarray([sEmbeddings[w] for w in sPhrase]).astype(np.float32)
-    #sys.exit(1)
     phrasePairs.append((sEmbeddings[sPhrase], tEmbeddings[tPhrase]))
-    #phrasePairs.append((np.asarray([sEmbeddings[w] for w in sPhrase]).astype(np.float32),
-      #np.asarray([tEmbeddings[w] for w in tPhrase]).astype(np.float32)))
 
   return phrasePairs
 
@@ -165,7 +157,7 @@ opts = parser.parse_args()
 # Hyperparameters
 s = {
   'lr': 0.627, # The learning rate
-  'bs':9, # number of backprops through time steps
+  'bs':1000, # number of backprops through time steps
   'nhidden':100, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
@@ -215,6 +207,6 @@ for e in xrange(s['nepochs']):
   shuffle(train, s['seed'])
   s['ce'] = e
   tic = time.time()
-  for batch in minibatch(train):
+  for batch in minibatch(train, s['bs']):
     pass
 

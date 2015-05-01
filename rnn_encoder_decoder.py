@@ -129,11 +129,6 @@ class RNNED(object):
                 value=0.2 * numpy.random.uniform(-1.0, 1.0, (nc, de))
                 .astype(theano.config.floatX))
 
-    # Parameter to be learnt : word embeddings
-    self.embeddings = theano.shared(name='embeddings',
-        value = 0.2 * numpy.random.uniform(-1.0, 1.0, (ne + 1, de))
-        .astype(theano.config.floatX))
-
     # Bundle the parameters
     self.encoderParams = [self.h0, self.W_e, self.U_e, self.W_z_e, self.U_z_e, self.W_r_e, self.U_r_e, self.V_e]
     self.encoderNames = ['h0', 'W_e', 'U_e', 'W_z_e', 'U_z_e', 'W_r_e', 'U_r_e', 'V_e']
@@ -150,10 +145,15 @@ class RNNED(object):
     """
     Trains the recurrent neural net
     """
-    idxs = T.imatrix() # columns = no of words in window, rows = len of sentence
-    # Prepare to recieve input and output labels
-    x = self.embeddings[idxs].reshape((idxs.shape[0], de*cs))
-    y = T.iscalar('y')
+    #idxs = T.imatrix() # columns = no of words in window, rows = len of sentence
+    ## Prepare to recieve input and output labels
+    #x = self.embeddings[idxs].reshape((idxs.shape[0], de*cs))
+    X = T.imatrix('X')
+    Y = T.imatrix('Y')
+    Y_IDX = T.imatrix('Y_IDX')
+    x = T.ivector('x')
+    y = T.ivector('y')
+    y_idx = T.ivector('y_idx')
 
     ######### ENCODER ##########
 
@@ -171,7 +171,7 @@ class RNNED(object):
     # Encoder Recurrence
     h_e, _ = theano.scan(fn=encoder_recurrence,
         sequences = x,
-        outputs_info=[self.h0, None],
+        outputs_info=[self.h0],
         n_steps=x.shape[0])
 
     # Compute the context vector
@@ -182,12 +182,19 @@ class RNNED(object):
     # Initialize the hidden state
     h_d_0 = self.tanh(T.dot(self.V_d, c))
 
-    def decoder_recurrence(y_tm1, h_tm1, c):
+    #def decoder_recurrence(y_tm1, h_tm1, c):
+    def decoder_recurrence(t, h_tm1, y_idx, c, y):
+      # Get the previous y
+      if t == 0:
+        y_tm1 = y0
+      else:
+        y_tm1 = y[t-1]
+
       r = T.nnet.sigmoid(T.dot(self.W_r_d, y_tm1) + T.dot(self.U_r_d, h_tm1) + T.dot(self.C_r_d, c))
       # Update gate
       z = T.nnet.sigmoid(T.dot(self.W_z_d, y_tm1) + T.dot(self.U_z_d, h_tm1) + T.dot(self.C_z_d, c))
       # Gated output
-      h_prime = T.tanh(T.dot(self.W_d, y_tm1) + T.dot(self.U_d, r * h_tm1) + T.dot(self.C_d, c))
+      h_prime = T.tanh(T.dot(self.W_d, y_tm1) +  r * (T.dot(self.U_d, r * h_tm1) + T.dot(self.C_d, c)))
       # Compute hidden state
       h_t = z * h_tm1 + (1 - z) * h_prime
       # Compute the activation based on y_tm1, c and h_t
@@ -199,38 +206,43 @@ class RNNED(object):
 
       # Softmax to get probabilities over target vocab
       p_t = T.nnet.softmax(T.dot(self.G, s))
-      return h_t, p_t
+      # TODO:Only return NLL : Select NLL for the observed y
+      nll_t = - T.log(p_t[y_idx[t], 0])
+      return [h_t, nll_t]
 
     # TODO: Check output info
     # TODO: y_0 should be empty
-    [h,p], _ = theano.scan(fn=decoder_recurrence,
-        sequences=y,
-        outputs_info=[self.h0, None],
-        n_steps=x.shape[0])
+    [h, nll], _ = theano.scan(fn=decoder_recurrence,
+        sequences = T.arange(y.shape(0)),
+        outputs_info = [h_d_0, None],
+        non_sequences = [y_idx, c, y],
+        n_steps = y.shape[0])
 
-    #print h.ndim
-    #print s.ndim
+    # Average phrase negative log likelihood
+    phrase_nll = T.mean(nll)
 
-    # TODO: What is the structure of s? What does the selection of axis do ?
-    p_y_given_sentence = s[:,0,:]
-    y_pred = T.argmax(p_y_given_sentence, axis=1)
+    self.phrase_train = theano.function(inputs=[x,y,y_idx], outputs=phrase_nll)
+
+    # Get the phrase_nlls for all sentences by iterating over the batch
+    phrase_nlls, _ = theano.scan(fn=self.phrase_train,
+        sequences= [X, Y, Y_IDX],
+        outputs_info = None,
+        n_steps=X.shape[0])
 
     # Learning rate
     lr = T.scalar('lr')
-    # Sentence negative log-likelihood (The objective function)
-    sentence_nll = - T.mean(T.log(p_y_given_sentence)[T.arange(x.shape[0]), y])
+
+    # Average batch negative log likelihood
+    batch_nll = T.mean(phrase_nlls)
+
     # Compute paramter wise gradients
-    sentence_gradients = T.grad(sentence_nll, self.params)
-    # Compute updats
-    sentence_updates = OrderedDict((p, p - lr*g) for p,g in zip(self.params, sentence_gradients))
+    batch_gradients = T.grad(batch_nll, self.params)
+    # Compute updates wrt the batch
+    batch_updates = OrderedDict((p, p - lr*g) for p,g in zip(self.params, batch_gradients))
 
     # Compile functions
-    self.classify = theano.function(inputs=[idxs], outputs=y_pred)
-    self.sentence_train = theano.function(inputs=[idxs, y, lr], outputs=sentence_nll, updates=sentence_updates)
-
-    # Normalize after each update : TODO: What is this update doing ?
-    self.normalize = theano.function(inputs=[],
-        updates={self.embeddings: self.embeddings / T.sqrt(self.embeddings ** 2).sum(axis=1).dimshuffle(0, 'x')})
+    self.batch_train = theano.function(inputs=[X,Y,Y_IDX,lr], outputs=batch_nll, updates=batch_updates)
+    self.batch_test = theano.function(inputs=[X,Y,Y_IDX], outputs=batch_nll)
 
   def save(self, folder):
     for param, name in zip(self.params, self.names):
