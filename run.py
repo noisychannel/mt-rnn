@@ -57,7 +57,7 @@ def readWordVectors(vectorBin, vocab, dim):
 
   # Now create the embedding matrix
   # TODO:What is the shape
-  embeddings = np.empty((len(vocab), dim))
+  embeddings = np.empty((len(vocab), dim), dtype=np.float32)
   # Embedding for the unknown symbol
   unk = np.ones((dim))
   # We don't want to count the explicit UNK as an unknown
@@ -71,7 +71,7 @@ def readWordVectors(vectorBin, vocab, dim):
   return unkCount, embeddings
 
 
-def parseCorpus(iFile):
+def parseCorpus(iFile, pruneThreshold):
   """
   """
   freq = defaultdict()
@@ -85,7 +85,7 @@ def parseCorpus(iFile):
   freqSort = sorted(freq.items(), key=operator.itemgetter(1), reverse=True)
   # Prune the vocab
   # TODO: Change this to a parameter
-  freqSort = freqSort[:5000]
+  freqSort = freqSort[:pruneThreshold]
   prunedWordCounts = reduce(lambda x, y: x + y, [x[1] for x in freqSort])
   vocab = defaultdict()
   rVocab = defaultdict()
@@ -105,7 +105,22 @@ def minibatch(l, bs):
   Yield batches
   """
   for i in xrange(0, len(l), bs):
-    yield l[i:i+n]
+    yield l[i:i+bs]
+
+
+def processBatch(batch):
+  """
+  Processes a batch to the format required by the RNNED functions
+  """
+  X = np.empty((len(batch), batch[0][0].shape[0], batch[0][0].shape[0]))
+  Y = np.empty((len(batch), batch[0][1].shape[0], batch[0][1].shape[0]))
+  Y_IDX = np.empty((len(batch), batch[0][2].shape[0]))
+  for i, (x, y, y_idx) in enumerate(batch):
+    X[i] = x
+    Y[i] = y
+    Y_IDX[i] = y_idx
+
+  return X, Y, Y_IDX
 
 
 def getPhrasePairs(tTable, sVocab, tVocab, sEmbeddings, tEmbeddings):
@@ -114,12 +129,12 @@ def getPhrasePairs(tTable, sVocab, tVocab, sEmbeddings, tEmbeddings):
   phrasePairs = []
   for line in tTable:
     line = line.strip().split("|||")
-    sPhrase = np.asarray([sVocab.get(w, 0) for w in line[0].strip().split()]).astype('int')
-    tPhrase = np.asarray([tVocab.get(w, 0) for w in line[1].strip().split()]).astype('int')
+    sPhrase = np.asarray([sVocab.get(w, 0) for w in line[0].strip().split()]).astype('int32')
+    tPhrase = np.asarray([tVocab.get(w, 0) for w in line[1].strip().split()]).astype('int32')
     # Don't include phrases that contain only OOVs
     if np.sum(sPhrase) == 0 or np.sum(tPhrase) == 0:
       continue
-    phrasePairs.append((sEmbeddings[sPhrase], tEmbeddings[tPhrase]))
+    phrasePairs.append((sEmbeddings[sPhrase], tEmbeddings[tPhrase], tPhrase))
 
   return phrasePairs
 
@@ -141,7 +156,8 @@ def getPartitions(phrasePairs, seed):
 
 parser = argparse.ArgumentParser("Runs the RNN encoder-decoder training procedure for machine translation")
 parser.add_argument("-p", "--phrase-table", dest="phraseTable",
-    default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.1.gz", help="The location of the phrase table")
+    default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.small.1.gz", help="The location of the phrase table")
+    #default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.1.gz", help="The location of the phrase table")
 parser.add_argument("-f", "--source", dest="sFile",
     default="/export/a04/gkumar/corpora/fishcall/kaldi_fishcall_output/SAT/ldc/processed/fisher_train.tok.lc.clean.es",
     help="The training text for the foreign (target) language")
@@ -157,17 +173,19 @@ opts = parser.parse_args()
 # Hyperparameters
 s = {
   'lr': 0.627, # The learning rate
+  #'bs':1000, # number of backprops through time steps
   'bs':1000, # number of backprops through time steps
   'nhidden':100, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
-  'nepochs':50 # The number of epochs that training is to run for
+  'nepochs':10, # The number of epochs that training is to run for
+  'prune_t':5000 # The frequency threshold for histogram pruning of the vocab
 }
 
 # First process the training dataset and get the source and target vocabulary
 start = time.time()
-sCoverage, s2idx, idx2s = parseCorpus(codecs.open(opts.sFile, encoding="utf8"))
-tCoverage, t2idx, idx2t = parseCorpus(codecs.open(opts.tFile, encoding="utf8"))
+sCoverage, s2idx, idx2s = parseCorpus(codecs.open(opts.sFile, encoding="utf8"), s['prune_t'])
+tCoverage, t2idx, idx2t = parseCorpus(codecs.open(opts.tFile, encoding="utf8"), s['prune_t'])
 print "***", sCoverage*100, "% of the source corpus covered by the pruned vocabulary"
 print "***", tCoverage*100, "% of the target corpus covered by the pruned vocabulary "
 print "--- Done creating vocabularies : ", time.time() - start, "s"
@@ -186,27 +204,20 @@ phraseTable = gzip.open(opts.phraseTable)
 phrasePairs = getPhrasePairs(phraseTable, s2idx, t2idx, sEmbeddings, tEmbeddings)
 print "--- Done reading phrase pairs from the phrase table : ", time.time() - start, "s"
 
-print len(phrasePairs)
-
 # Create the training and the dev partitions
 train, dev = getPartitions(phrasePairs, s['seed'])
-print len(train)
-print len(dev)
 
-#TODO: Do I need these variables?
-sVocSize = len(s2idx)
 tVocSize = len(t2idx)
 nTrainExamples = len(train)
 
-print sVocSize, tVocSize
-sys.exit(1)
-
-rnn = rnned.RNNED(nh=s['nhidden'], nc=nClasses, ne=vocSize, de=s['emb_dimension'])
+start = time.time()
+rnn = rnned.RNNED(nh=s['nhidden'], nc=tVocSize, de=s['emb_dimension'])
+print "--- Done compiling theano functions : ", time.time() - start, "s"
 
 for e in xrange(s['nepochs']):
   shuffle(train, s['seed'])
   s['ce'] = e
   tic = time.time()
-  for batch in minibatch(train, s['bs']):
-    pass
-
+  for i, batch in enumerate(minibatch(train, s['bs'])):
+    rnn.train(batch, s['lr'])
+    print '[learning] epoch %i >> %2.2f%%'%(e,(i * s['bs'])*100./nTrainExamples),'completed in %.2f (sec) <<'%(time.time()-tic),
