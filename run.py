@@ -220,4 +220,8 @@ for e in xrange(s['nepochs']):
   tic = time.time()
   for i, batch in enumerate(minibatch(train, s['bs'])):
     rnn.train(batch, s['lr'])
-    print '[learning] epoch %i >> %2.2f%%'%(e,(i * s['bs'])*100./nTrainExamples),'completed in %.2f (sec) <<'%(time.time()-tic),
+
+  print '[learning] epoch', e,  '>> completed in', time.time() - tic, '(sec) <<'
+  sys.stdout.flush()
+
+  rnn.test(dev)

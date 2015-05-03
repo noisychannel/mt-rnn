@@ -6,9 +6,9 @@ import theano.typed_list
 from theano import tensor as T
 from collections import OrderedDict
 
-#theano.config.exception_verbosity = 'high'
-#theano.config.optimizer = 'None'
-#theano.traceback_limit = -1
+theano.config.exception_verbosity = 'high'
+theano.config.optimizer = 'None'
+theano.traceback_limit = -1
 #theano.profile = True
 #theano.profile_optimizer = True
 #theano.profile_memory = True
@@ -151,8 +151,6 @@ class RNNED(object):
     self.decoderNames = ['V_d', 'W_d', 'U_d', 'C_d', 'W_z_d', 'U_z_d', 'C_z_d', 'W_r_d', 'U_r_d', 'C_r_d', 'O_h', 'O_y', 'O_c', 'G']
     self.params = self.encoderParams + self.decoderParams
     self.names = self.encoderNames + self.decoderNames
-
-    # Accumulates gradients for the batch so that they can be averaged and applied
     self.batch_gradients = OrderedDict((p,[]) for p in self.params)
 
     # Compile training function
@@ -245,22 +243,44 @@ class RNNED(object):
       return phrase_nll, T.grad(phrase_nll, self.params)
 
     # Learning rate
-    #lr = T.scalar('lr')
+    lr = T.scalar('lr')
 
     # Average batch negative log likelihood
     #theano.printing.debugprint(batch_nll)
     #theano.printing.pydotprint(batch_nll, "nll.png", compact=True, var_with_name_simple=True)
     # Average phrase negative log likelihood
     phrase_nll, phrase_gradients = decoder(X,Y,Y_IDX)
+    phrase_updates = OrderedDict((p, p - lr*g) for p,g in zip(self.params, phrase_gradients))
     # Accumulate gradients so that they can be averaged and applied later
-    for p,g in zip(self.params, phrase_gradients):
-      self.batch_gradients[p].append(g)
+    #for p,g in zip(self.params, phrase_gradients):
+      #self.batch_gradients[p].append(g)
 
-    self.phrase_train = theano.function(inputs=[X,Y,Y_IDX], outputs=phrase_nll, on_unused_input='warn')
+    self.phrase_train = theano.function(inputs=[X,Y,Y_IDX,lr], outputs=phrase_nll, on_unused_input='warn', updates=phrase_updates)
+    self.phrase_test = theano.function(inputs=[X,Y,Y_IDX], outputs=phrase_nll, on_unused_input='warn')
 
   def train(self, batch, lr):
+    # Accumulates gradients for the batch so that they can be averaged and applied
+    #self.batch_gradients = OrderedDict((p,[]) for p in self.params)
+    #print self.W_d.get_value()
+    #batch_size = len(batch)
+    #phrase_nll = 0
     for (x,y,y_idx) in batch:
-      self.phrase_train(x,y,y_idx)
+      self.phrase_train(x,y,y_idx,lr)
+
+    #print self.batch_gradients
+    #for p, g in self.batch_gradients.iteritems():
+      #p = p - lr * T.mean(numpy.asarray(g))
+
+    #print float(phrase_nll) / batch_size
+
+  def test(self, batch):
+    batch_size = len(batch)
+    batch_nll = 0
+    for (x,y,y_idx) in batch:
+      batch_nll += self.phrase_test(x,y,y_idx)
+
+    print "Test average LL = ", float(batch_nll)/batch_size
+
 
   def save(self, folder):
     for param, name in zip(self.params, self.names):
