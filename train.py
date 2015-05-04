@@ -10,11 +10,15 @@ import gzip
 import time
 import codecs
 import random
+import pickle
 import operator
 import argparse
 import numpy as np
 from collections import defaultdict
 import rnn_encoder_decoder as rnned
+
+# For pickle to work properly
+sys.setrecursionlimit(50000)
 
 
 def readWordVectors(vectorBin, vocab, dim):
@@ -175,6 +179,24 @@ def getPartitions(phrasePairs, seed):
   return phrasePairs[:int(0.8 * len(phrasePairs))], phrasePairs[int(0.8 * len(phrasePairs)):]
 
 
+def saveModel(outDir, sVocab, tVocab, sEmbedding, tEmbedding, rnn):
+  """
+  Pickles a model
+
+  Parameters:
+    outDir : The output directory (created if it does not exist)
+    sVocab : The source vocabulary
+    tVocab : The target vocabulary
+    sEmbedding : The source word embeddings
+    tEmbedding : The target word embeddings
+    rnn : An RNN encoder-decoder model
+  """
+  os.system("mkdir -p " + outDir)
+  os.system("mv " + outDir + "/best.mdl " + outDir + "/secondBest.mdl 2>/dev/null")
+  with open(outDir + "/best.mdl", "wb") as m:
+    pickle.dump([sVocab, tVocab, sEmbedding, tEmbedding, rnn], m)
+
+
 parser = argparse.ArgumentParser("Runs the RNN encoder-decoder training procedure for machine translation")
 parser.add_argument("-p", "--phrase-table", dest="phraseTable",
     default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.tiny.1.gz", help="The location of the phrase table")
@@ -189,6 +211,7 @@ parser.add_argument("-s", "--source-emb", dest="sEmbeddings",
     default="/export/a04/gkumar/code/custom/brae/tools/word2vec/fisher_es.vectors.50.sg.bin", help="Source embeddings obtained from word2vec")
 parser.add_argument("-t", "--target-emb", dest="tEmbeddings",
     default="/export/a04/gkumar/code/custom/brae/tools/word2vec/fisher_en.vectors.50.sg.bin", help="Target embeddings obtained from word2vec")
+parser.add_argument("-o", "--outdir", dest="outDir", default="data/1.tiny", help="An output directory where the model is written")
 opts = parser.parse_args()
 
 
@@ -236,16 +259,30 @@ rnn = rnned.RNNED(nh=s['nhidden'], nc=tVocSize, de=s['emb_dimension'])
 print "--- Done compiling theano functions : ", time.time() - start, "s"
 
 # Training
+best_dev_nll = np.inf
+s['clr'] = s['lr']
 for e in xrange(s['nepochs']):
   # Shuffle the examples
   shuffle(train, s['seed'])
   s['ce'] = e
   tic = time.time()
   for i, batch in enumerate(minibatch(train, s['bs'])):
-    rnn.train(batch, s['lr'])
+    rnn.train(batch, s['clr'])
 
   print '[learning] epoch', e,  '>> completed in', time.time() - tic, '(sec) <<'
   sys.stdout.flush()
 
   # Get the average NLL For the validation set
-  print rnn.test(dev)
+  dev_nll = rnn.test(dev)
+  print '[dev-nll]', dev_nll, "(NEW BEST)" if dev_nll < best_dev_nll else ""
+
+  if dev_nll < best_dev_nll:
+    best_dev_nll = dev_nll
+    s['be'] = e
+    saveModel(opts.outDir, s2idx, t2idx, sEmbeddings, tEmbeddings, rnn)
+
+  # Decay learning rate if there's no improvement in 3 epochs
+  if abs(s['be'] - s['ce']) >= 3: s['clr'] *= 0.5
+  if s['clr'] < 1e-5: break
+
+print '[BEST DEV-NLL]', best_dev_nll

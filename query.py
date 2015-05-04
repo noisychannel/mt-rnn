@@ -5,8 +5,10 @@ Queries a pre-trained RNN encoder decoder model to get (average per-token) phras
 """
 
 import sys
+import math
 import pickle
 import argparse
+import numpy as np
 
 def prepareQuery(query, sVocab, tVocab, sEmbeddings, tEmbeddings):
   """
@@ -33,10 +35,10 @@ if opts.modelFile is None or opts.queryFile is None:
 
 # Read parameters from a pickled object
 with open(opts.modelFile, "rb") as model:
-  [sVocab, tVocab, sEmbedding, tEmbedding, rnn] = pickle.load(model)
+  [sVocab, tVocab, sEmbeddings, tEmbeddings, rnn] = pickle.load(model)
 
 # Get the query in a format the RNNED will like
 dev = prepareQuery(open(opts.queryFile), sVocab, tVocab, sEmbeddings, tEmbeddings)
 
 for query in dev:
-  print rnn.test(query)
+  print round(math.exp(-1. * rnn.test([query])), 8)
