@@ -19,7 +19,7 @@ def prepareQuery(query, sVocab, tVocab, sEmbeddings, tEmbeddings):
     phrasePairs.append((sEmbeddings[sPhrase], tEmbeddings[tPhrase], tPhrase))
   return phrasePairs
 
-parser = argparse.ArgumentParser("Queries a bre-built RNN encoder-decoder model")
+parser = argparse.ArgumentParser("Queries a pre-built RNN encoder-decoder model")
 parser.add_argument("-m", "--model", dest="modelFile", help="A pre-trained RNN encoder-decoder model (Run train.py to obtain a model file)")
 parser.add_argument("-q", "--query", dest="queryFile", help="A file containing queries in the s|||t format")
 opts = parser.parse_args()
