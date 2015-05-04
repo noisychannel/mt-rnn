@@ -218,7 +218,7 @@ opts = parser.parse_args()
 # Hyperparameters
 s = {
   'lr': 0.0827, # The learning rate
-  'bs':100, # size of the mini-batch
+  'bs':1000, # size of the mini-batch
   'nhidden':500, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding

@@ -1,0 +1,62 @@
+################## with phrase_table.tiny and bs = 100 ##################
+
+*** 96.2504666178 % of the source corpus covered by the pruned vocabulary
+*** 98.4637788708 % of the target corpus covered by the pruned vocabulary
+--- Done creating vocabularies :  2.47776293755 s
+*** 0  source types were not seen in the embeddings
+*** 0  target types were not seen in the embeddings
+--- Done reading embeddings for source and target :  0.0833561420441 s
+--- Done reading phrase pairs from the phrase table :  0.0511441230774 s
+--- Done compiling theano functions :  27.4808850288 s
+[learning] epoch 0 >> completed in 37.3702690601 (sec) <<
+[dev-nll] 7.94646745828 (NEW BEST)
+[learning] epoch 1 >> completed in 36.9679820538 (sec) <<
+[dev-nll] 7.40665284181 (NEW BEST)
+[learning] epoch 2 >> completed in 39.3002970219 (sec) <<
+[dev-nll] 7.07240764055 (NEW BEST)
+[learning] epoch 3 >> completed in 37.3726079464 (sec) <<
+[dev-nll] 6.85456544864 (NEW BEST)
+[learning] epoch 4 >> completed in 37.0542449951 (sec) <<
+[dev-nll] 6.70645470191 (NEW BEST)
+[learning] epoch 5 >> completed in 36.791326046 (sec) <<
+[dev-nll] 6.56487099758 (NEW BEST)
+[learning] epoch 6 >> completed in 37.1712517738 (sec) <<
+[dev-nll] 6.47577341214 (NEW BEST)
+[learning] epoch 7 >> completed in 37.0897359848 (sec) <<
+[dev-nll] 6.39458459891 (NEW BEST)
+[learning] epoch 8 >> completed in 36.6291840076 (sec) <<
+[dev-nll] 6.29816156534 (NEW BEST)
+[learning] epoch 9 >> completed in 38.1916201115 (sec) <<
+[dev-nll] 6.25076402395 (NEW BEST)
+[learning] epoch 10 >> completed in 39.6568078995 (sec) <<
+[dev-nll] 6.16572064436 (NEW BEST)
+[learning] epoch 11 >> completed in 37.9606201649 (sec) <<
+[dev-nll] 6.15549427179 (NEW BEST)
+[learning] epoch 12 >> completed in 39.1811790466 (sec) <<
+[dev-nll] 6.0641703465 (NEW BEST)
+[learning] epoch 13 >> completed in 38.2946109772 (sec) <<
+[dev-nll] 6.15935344452
+[learning] epoch 14 >> completed in 40.7319910526 (sec) <<
+[dev-nll] 5.9809255496 (NEW BEST)
+[learning] epoch 15 >> completed in 39.3793721199 (sec) <<
+[dev-nll] 5.93292744588 (NEW BEST)
+[learning] epoch 16 >> completed in 40.7083690166 (sec) <<
+[dev-nll] 6.14959180661
+[learning] epoch 17 >> completed in 39.4512360096 (sec) <<
+[dev-nll] 5.91269977887 (NEW BEST)
+[learning] epoch 18 >> completed in 38.763655901 (sec) <<
+[dev-nll] 5.86221709007 (NEW BEST)
+[learning] epoch 19 >> completed in 40.2489590645 (sec) <<
+[dev-nll] 5.8798455489
+[learning] epoch 20 >> completed in 39.2086250782 (sec) <<
+[dev-nll] 5.878886372
+[learning] epoch 21 >> completed in 40.6329228878 (sec) <<
+[dev-nll] 5.80392493346 (NEW BEST)
+[learning] epoch 22 >> completed in 37.2270851135 (sec) <<
+[dev-nll] 5.79684821398 (NEW BEST)
+[learning] epoch 23 >> completed in 72.2641048431 (sec) <<
+[dev-nll] 5.87407158216
+[learning] epoch 24 >> completed in 113.701845884 (sec) <<
+[dev-nll] 5.79212863017 (NEW BEST)
+[BEST DEV-NLL] 5.79212863017
+###################################################################
