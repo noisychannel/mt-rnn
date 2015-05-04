@@ -156,7 +156,7 @@ def getPartitions(phrasePairs, seed):
 
 parser = argparse.ArgumentParser("Runs the RNN encoder-decoder training procedure for machine translation")
 parser.add_argument("-p", "--phrase-table", dest="phraseTable",
-    default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.small.1.gz", help="The location of the phrase table")
+    default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.tiny.1.gz", help="The location of the phrase table")
     #default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.1.gz", help="The location of the phrase table")
 parser.add_argument("-f", "--source", dest="sFile",
     default="/export/a04/gkumar/corpora/fishcall/kaldi_fishcall_output/SAT/ldc/processed/fisher_train.tok.lc.clean.es",
@@ -172,13 +172,13 @@ opts = parser.parse_args()
 
 # Hyperparameters
 s = {
-  'lr': 0.627, # The learning rate
+  'lr': 0.0827, # The learning rate
   #'bs':1000, # number of backprops through time steps
-  'bs':1000, # number of backprops through time steps
-  'nhidden':100, # Size of the hidden layer
+  'bs':100, # number of backprops through time steps
+  'nhidden':500, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
-  'nepochs':10, # The number of epochs that training is to run for
+  'nepochs':25, # The number of epochs that training is to run for
   'prune_t':5000 # The frequency threshold for histogram pruning of the vocab
 }
 
@@ -224,4 +224,4 @@ for e in xrange(s['nepochs']):
   print '[learning] epoch', e,  '>> completed in', time.time() - tic, '(sec) <<'
   sys.stdout.flush()
 
-  rnn.test(dev)
+  print rnn.test(dev)
