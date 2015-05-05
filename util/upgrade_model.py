@@ -32,7 +32,7 @@ os.system("mv " + opts.modelFile + " " + oldModelFile)
 with open(oldModelFile, "rb") as model:
   [sVocab, tVocab, sEmbeddings, tEmbeddings, rnn] = pickle.load(model)
 
-lParameters = [sVocab, tVocab, sEmbedding, tEmbedding]
+lParameters = [sVocab, tVocab, sEmbeddings, tEmbeddings]
 rParameters = [p.get_value() for p in rnn.params]
 
 with open(opts.modelFile, "wb") as m:

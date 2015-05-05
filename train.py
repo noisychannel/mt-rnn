@@ -226,7 +226,7 @@ s = {
   'nhidden':500, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
-  'nepochs':25, # The number of epochs that training is to run for
+  'nepochs':1, # The number of epochs that training is to run for
   'prune_t':5000 # The frequency threshold for histogram pruning of the vocab
 }
 

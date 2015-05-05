@@ -41,24 +41,24 @@ class RNNED(object):
     de : dimension of embedding
     model : A list of pre-trained parameters
     """
+    # The hidden layer at time t=0
+    self.h0 = theano.shared(name='h0',
+        value = numpy.zeros(nh,
+          dtype=theano.config.floatX))
+
+    # For the decoder, to combine at time 0, this represents the input at time -1
+    self.y0 = theano.shared(name='y0',
+        value = numpy.zeros(nh,
+          dtype=theano.config.floatX))
 
     if model is not None:
       # Pre-trained parameters supplied
+      print "*** Loading pre-trained model"
       [self.W_e, self.U_e, self.W_z_e, self.U_z_e, self.W_r_e, self.U_r_e, self.V_e, \
         self.V_d, self.W_d, self.U_d, self.C_d, self.W_z_d, self.U_z_d, self.C_z_d, self.W_r_d, \
-        self.U_r_d, self.C_r_d, self.O_h, self.O_y, self.O_c, self.G] = model
+        self.U_r_d, self.C_r_d, self.O_h, self.O_y, self.O_c, self.G] = [theano.shared(p) for p in model]
 
     else:
-      # The hidden layer at time t=0
-      self.h0 = theano.shared(name='h0',
-          value = numpy.zeros(nh,
-            dtype=theano.config.floatX))
-
-      # For the decoder, to combine at time 0, this represents the input at time -1
-      self.y0 = theano.shared(name='y0',
-          value = numpy.zeros(nh,
-            dtype=theano.config.floatX))
-
       # Parameter : Weight matrix for the encoder hidden state
       self.W_e = theano.shared(name='W_e',
                   value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
