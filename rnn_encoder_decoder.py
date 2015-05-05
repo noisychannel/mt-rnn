@@ -322,21 +322,24 @@ class RNNED(object):
       lr : The learning rate for SGD
     """
     # Accumulates gradients for the batch so that they can be averaged and applied
-    grads = None
+    grad_acc = None
     # Train wrt each example in the batch
     for (x,y,y_idx) in batch:
       grad = self.phrase_train(x,y,y_idx)
+      # Explicit typecast to numpy ndarray
+      # This is because the GPU returns a cudandarray
+      grad = [numpy.asarray(g) for g in grad]
       # Accumulate gradients
-      if grads is None:
-        grads = grad
+      if grad_acc is None:
+        grad_acc = grad
       else:
-        grads = [sum(x) for x in zip(grads, grad)]
+        grad_acc = [sum(x) for x in zip(grad_acc, grad)]
 
     # Average gradients
-    grads = [g / len(batch) for g in grads]
+    grad_acc = [g / len(batch) for g in grad_acc]
 
     # Update shared variables
-    for p,g in zip(self.params, grads):
+    for p,g in zip(self.params, grad_acc):
       p.set_value(p.get_value() - lr*g)
 
 
