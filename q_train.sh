@@ -8,6 +8,9 @@
 #$ -V
 #$ -j y -o log/medium.2.log
 
+
+########### SGE WRAPPER FOR RNNED TRAINING #########################
+
 echo "Starting job on : " `hostname`
 echo "Started at : " `date`
 
@@ -30,7 +33,7 @@ else
   compileDir=/export/a04/gkumar/tmp/gk.$RANDOM
 fi
 
-THEANO_FLAGS=compiledir=${compileDir},mode=FAST_RUN,device=gpu,floatX=float32 python train.py \
-  -p ${phraseTable} -o ${outDir} -b ${bs}
+THEANO_FLAGS=compiledir=${compileDir},mode=FAST_RUN,device=gpu,floatX=float32,allow_gc=False,nvcc.fastmath=True \
+  python train.py -p ${phraseTable} -o ${outDir} -b ${bs}
 
 echo "Finished job at " `date`

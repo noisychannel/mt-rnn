@@ -182,6 +182,7 @@ def getPartitions(phrasePairs, seed):
 def saveModel(outDir, sVocab, tVocab, sEmbedding, tEmbedding, rnn):
   """
   Pickles a model
+  Don't pickle the entire RNN object (needs deep recursion limit and may be GPU compiled)
 
   Parameters:
     outDir : The output directory (created if it does not exist)
@@ -191,10 +192,12 @@ def saveModel(outDir, sVocab, tVocab, sEmbedding, tEmbedding, rnn):
     tEmbedding : The target word embeddings
     rnn : An RNN encoder-decoder model
   """
+  lParameters = [sVocab, tVocab, sEmbedding, tEmbedding]
+  rParameters = rnn.getParams()
   os.system("mkdir -p " + outDir)
   os.system("mv " + outDir + "/best.mdl " + outDir + "/secondBest.mdl 2>/dev/null")
   with open(outDir + "/best.mdl", "wb") as m:
-    pickle.dump([sVocab, tVocab, sEmbedding, tEmbedding, rnn], m)
+    pickle.dump([[lParameters], [rParameters]], m)
 
 
 parser = argparse.ArgumentParser("Runs the RNN encoder-decoder training procedure for machine translation")

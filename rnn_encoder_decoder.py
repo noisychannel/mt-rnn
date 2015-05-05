@@ -32,125 +32,133 @@ from collections import OrderedDict
 class RNNED(object):
   """ RNN encoder-decoder """
 
-  def __init__(self, nh, nc, de):
+  def __init__(self, nh, nc, de, model=None):
     """
     Parameters:
     Hyperparameters used for initialization
     nh : dimension of the hidden layers
     nc : number of classes (labels)
     de : dimension of embedding
+    model : A list of pre-trained parameters
     """
 
-    # The hidden layer at time t=0
-    self.h0 = theano.shared(name='h0',
-        value = numpy.zeros(nh,
-          dtype=theano.config.floatX))
+    if model is not None:
+      # Pre-trained parameters supplied
+      [self.W_e, self.U_e, self.W_z_e, self.U_z_e, self.W_r_e, self.U_r_e, self.V_e, \
+        self.V_d, self.W_d, self.U_d, self.C_d, self.W_z_d, self.U_z_d, self.C_z_d, self.W_r_d, \
+        self.U_r_d, self.C_r_d, self.O_h, self.O_y, self.O_c, self.G] = model
 
-    # For the decoder, to combine at time 0, this represents the input at time -1
-    self.y0 = theano.shared(name='y0',
-        value = numpy.zeros(nh,
-          dtype=theano.config.floatX))
+    else:
+      # The hidden layer at time t=0
+      self.h0 = theano.shared(name='h0',
+          value = numpy.zeros(nh,
+            dtype=theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state
-    self.W_e = theano.shared(name='W_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # For the decoder, to combine at time 0, this represents the input at time -1
+      self.y0 = theano.shared(name='y0',
+          value = numpy.zeros(nh,
+            dtype=theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state
-    self.U_e = theano.shared(name='U_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state
+      self.W_e = theano.shared(name='W_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state : Reset gate
-    self.W_z_e = theano.shared(name='W_z_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state
+      self.U_e = theano.shared(name='U_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state : Reset gate
-    self.U_z_e = theano.shared(name='U_z_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state : Reset gate
+      self.W_z_e = theano.shared(name='W_z_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state : Update gate
-    self.W_r_e = theano.shared(name='W_r_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state : Reset gate
+      self.U_z_e = theano.shared(name='U_z_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the encoder hidden state : Update gate
-    self.U_r_e = theano.shared(name='U_r_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state : Update gate
+      self.W_r_e = theano.shared(name='W_r_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the computation of the context vector
-    self.V_e = theano.shared(name='V_e',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (de, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the encoder hidden state : Update gate
+      self.U_r_e = theano.shared(name='U_r_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the initialization of the hidden state of the decoder
-    self.V_d = theano.shared(name='V_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the computation of the context vector
+      self.V_e = theano.shared(name='V_e',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (de, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state
-    self.W_d = theano.shared(name='W_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the initialization of the hidden state of the decoder
+      self.V_d = theano.shared(name='V_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state
-    self.U_d = theano.shared(name='U_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state
+      self.W_d = theano.shared(name='W_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state
-    self.C_d = theano.shared(name='C_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state
+      self.U_d = theano.shared(name='U_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Update gate
-    self.W_z_d = theano.shared(name='W_z_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state
+      self.C_d = theano.shared(name='C_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Update gate
-    self.U_z_d = theano.shared(name='U_z_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Update gate
+      self.W_z_d = theano.shared(name='W_z_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Update gate
-    self.C_z_d = theano.shared(name='C_z_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Update gate
+      self.U_z_d = theano.shared(name='U_z_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Reset gate
-    self.W_r_d = theano.shared(name='W_r_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Update gate
+      self.C_z_d = theano.shared(name='C_z_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Reset gate
-    self.U_r_d = theano.shared(name='U_r_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Reset gate
+      self.W_r_d = theano.shared(name='W_r_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    # Parameter : Weight matrix for the decoder hidden state : Reset gate
-    self.C_r_d = theano.shared(name='C_r_d',
-                value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Reset gate
+      self.U_r_d = theano.shared(name='U_r_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, nh))
+                  .astype(theano.config.floatX))
 
-    self.O_h = theano.shared(name='O_h',
-                value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, nh))
-                .astype(theano.config.floatX))
+      # Parameter : Weight matrix for the decoder hidden state : Reset gate
+      self.C_r_d = theano.shared(name='C_r_d',
+                  value = 0.2 * numpy.random.uniform(-1.0, 1.0, (nh, de))
+                  .astype(theano.config.floatX))
 
-    self.O_y = theano.shared(name='O_y',
-                value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, de))
-                .astype(theano.config.floatX))
+      self.O_h = theano.shared(name='O_h',
+                  value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, nh))
+                  .astype(theano.config.floatX))
 
-    self.O_c = theano.shared(name='O_c',
-                value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, de))
-                .astype(theano.config.floatX))
+      self.O_y = theano.shared(name='O_y',
+                  value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, de))
+                  .astype(theano.config.floatX))
 
-    self.G = theano.shared(name='G',
-                value=0.2 * numpy.random.uniform(-1.0, 1.0, (nc, de))
-                .astype(theano.config.floatX))
+      self.O_c = theano.shared(name='O_c',
+                  value=0.2 * numpy.random.uniform(-1.0, 1.0, (de, de))
+                  .astype(theano.config.floatX))
+
+      self.G = theano.shared(name='G',
+                  value=0.2 * numpy.random.uniform(-1.0, 1.0, (nc, de))
+                  .astype(theano.config.floatX))
 
     # Bundle the parameters
     self.encoderParams = [self.W_e, self.U_e, self.W_z_e, self.U_z_e, self.W_r_e, self.U_r_e, self.V_e]
@@ -374,6 +382,16 @@ class RNNED(object):
     return self.batch_nll.get_value()
 
 
+  def getParams(self):
+    """
+    Returns the values of the shared parameters (for pickling)
+    """
+    return [p.get_value() for p in self.params]
+
+
   def save(self, folder):
+    """
+    Saves the model parameters in the form of numpy pickled objects
+    """
     for param, name in zip(self.params, self.names):
       numpy.save(os.path.join(folder, name + '.npy'), param.get_value())
