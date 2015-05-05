@@ -274,8 +274,11 @@ for e in xrange(s['nepochs']):
   sys.stdout.flush()
 
   # Get the average NLL For the validation set
-  dev_nll = rnn.test(dev)
-  print '[dev-nll]', dev_nll, "(NEW BEST)" if dev_nll < best_dev_nll else ""
+  tic = time.time()
+  dev_nlls = rnn.test(dev)
+  dev_nll = np.mean(dev_nlls)
+  print '[dev-nll]', dev_nll, "(NEW BEST)" if dev_nll < best_dev_nll else "", "completed in", time.time() - tic, '(sec)'
+  sys.stdout.flush()
 
   if dev_nll < best_dev_nll:
     best_dev_nll = dev_nll
@@ -287,3 +290,4 @@ for e in xrange(s['nepochs']):
   if s['clr'] < 1e-5: break
 
 print '[BEST DEV-NLL]', best_dev_nll
+print '[FINAL-LEARNING-RATE]', s['clr']

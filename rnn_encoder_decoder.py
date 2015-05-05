@@ -11,6 +11,7 @@ Notes :
 """
 
 import sys
+import time
 import os
 import numpy
 import theano
@@ -160,6 +161,11 @@ class RNNED(object):
     self.params = self.encoderParams + self.decoderParams
     self.names = self.encoderNames + self.decoderNames
 
+    # Accumulates gradients
+    self.batch_gradients = [theano.shared(value = numpy.zeros((p.get_value().shape)).astype(theano.config.floatX)) for p in self.params]
+    # Dummy shared variable that will be updated to accumulate NLLs
+    self.batch_nll = theano.shared(value = numpy.zeros((1)).astype(theano.config.floatX))
+
     # Compile training function
     self.prepare_train(de)
 
@@ -222,7 +228,7 @@ class RNNED(object):
       return c
 
 
-    def decoder(x,y, y_idx):
+    def decoder(x,y, y_idx, train_flag=True):
       """
       The decoder of the RNN encoder-decoder model
       Invokes the encoder of this model to get the context vector for the input
@@ -232,10 +238,12 @@ class RNNED(object):
         y : The output phrase/sentence : The decoder will apply its recurrence over this sequence
         y_idx : A vector containg the vocab (target) indices for the current output phrase so that
                 they can be easily looked up in the softmax output
+        train_flag : (Optional) A flag which enables training (enabled by default). Basically, this function returns
+                  gradients only when this flag is set
 
       Returns:
         phrase_nll : The output of the objective function : The negative log-likelihood of the output
-        phrase_grads : The gradients of the objective function with respect to the parameters of the model
+        phrase_grads : (Conditional : Check train_flag) The gradients of the objective function with respect to the parameters of the model
                         These are cached and the parameters are updated only once per batch to improve stability
       """
       # Get the context vector for the input from the encoder
@@ -298,18 +306,26 @@ class RNNED(object):
 
       # Compute the average NLL for this phrase
       phrase_nll = T.mean(nll)
-      return phrase_nll, T.grad(phrase_nll, self.params)
+      if train_flag:
+        return phrase_nll, T.grad(phrase_nll, self.params)
+      else:
+        return phrase_nll
 
     # Learning rate
     lr = T.scalar('lr')
+    # example index
+    i = T.iscalar('i')
 
     # Get the average phrase NLL and the gradients
-    phrase_nll, phrase_gradients = decoder(X,Y,Y_IDX)
+    phrase_train_nll, phrase_gradients = decoder(X,Y,Y_IDX)
+    phrase_test_nll = decoder(X,Y,Y_IDX,False)
+
+    train_updates = OrderedDict((p, p + g) for p,g in zip(self.batch_gradients, phrase_gradients))
+    test_updates = [(self.batch_nll, T.set_subtensor(self.batch_nll[i], phrase_test_nll))]
     # Compile theano functions for training and testing
-    # The train function returns the gradients so that they can be accumulated and averaged per batch
-    self.phrase_train = theano.function(inputs=[X,Y,Y_IDX], outputs=phrase_gradients, on_unused_input='warn')
+    self.phrase_train = theano.function(inputs=[X,Y,Y_IDX], on_unused_input='warn', updates=train_updates)
     # The test function return phrase average NLL
-    self.phrase_test = theano.function(inputs=[X,Y,Y_IDX], outputs=phrase_nll, on_unused_input='warn')
+    self.phrase_test = theano.function(inputs=[i,X,Y,Y_IDX], on_unused_input='warn', updates=test_updates)
 
 
   def train(self, batch, lr):
@@ -321,22 +337,16 @@ class RNNED(object):
       batch : A minibatch containing tuples of the input(x), output(y) and the outut vocab indices (y_idx)
       lr : The learning rate for SGD
     """
-    # Accumulates gradients for the batch so that they can be averaged and applied
-    grad_acc = None
     # Train wrt each example in the batch
     for (x,y,y_idx) in batch:
-      grad = self.phrase_train(x,y,y_idx)
-      # Explicit typecast to numpy ndarray
-      # This is because the GPU returns a cudandarray
-      grad = [numpy.asarray(g) for g in grad]
-      # Accumulate gradients
-      if grad_acc is None:
-        grad_acc = grad
-      else:
-        grad_acc = [sum(x) for x in zip(grad_acc, grad)]
+      self.phrase_train(x,y,y_idx)
 
     # Average gradients
+    grad_acc = [g.get_value() for g in self.batch_gradients]
     grad_acc = [g / len(batch) for g in grad_acc]
+    # Reset gradients
+    for (p,g) in zip(self.params, self.batch_gradients):
+      g.set_value(numpy.zeros((p.get_value().shape)).astype(theano.config.floatX))
 
     # Update shared variables
     for p,g in zip(self.params, grad_acc):
@@ -352,15 +362,16 @@ class RNNED(object):
       batch : A minibatch containing tuples of the input(x), output(y) and the outut vocab indices (y_idx)
 
     Returns:
-      batch_nll : The average per token NLL for this batch
+      batch_nll : An array of the average per token NLL per example for this batch
     """
     batch_size = len(batch)
-    batch_nll = 0
+    # Update the size of the shared parameter
+    self.batch_nll.set_value(numpy.zeros((batch_size)).astype(theano.config.floatX))
     # Get the average phrase NLL wrt each example in the test/validation set
-    for (x,y,y_idx) in batch:
-      batch_nll += self.phrase_test(x,y,y_idx)
+    for i, (x,y,y_idx) in enumerate(batch):
+      self.phrase_test(i,x,y,y_idx,)
 
-    return float(batch_nll)/batch_size
+    return self.batch_nll.get_value()
 
 
   def save(self, folder):
