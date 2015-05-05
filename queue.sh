@@ -11,6 +11,7 @@
 echo "Starting job on : " `hostname`
 echo "Started at : " `date`
 
+bs=1000
 phraseTable=/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.small.1.gz
 #phraseTable=/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.1.gz
 outDir=/export/a04/gkumar/code/custom/rnn/data/1.small
@@ -26,6 +27,6 @@ else
 fi
 
 THEANO_FLAGS=compiledir=${compileDir},mode=FAST_RUN,device=gpu,floatX=float32 python train.py \
-  -p ${phraseTable} -o ${outDir}
+  -p ${phraseTable} -o ${outDir} -b ${bs}
 
 echo "Finished job at " `date`

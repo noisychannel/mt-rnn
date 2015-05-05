@@ -212,13 +212,14 @@ parser.add_argument("-s", "--source-emb", dest="sEmbeddings",
 parser.add_argument("-t", "--target-emb", dest="tEmbeddings",
     default="/export/a04/gkumar/code/custom/brae/tools/word2vec/fisher_en.vectors.50.sg.bin", help="Target embeddings obtained from word2vec")
 parser.add_argument("-o", "--outdir", dest="outDir", default="data/1.tiny", help="An output directory where the model is written")
+parser.add_argument("-b", "--batch-size", dest="bs", default=100, help="The batch size for SGD")
 opts = parser.parse_args()
 
 
 # Hyperparameters
 s = {
   'lr': 0.0827, # The learning rate
-  'bs':1000, # size of the mini-batch
+  'bs':opts.bs, # size of the mini-batch
   'nhidden':500, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
