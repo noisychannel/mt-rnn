@@ -200,6 +200,26 @@ def saveModel(outDir, sVocab, tVocab, sEmbedding, tEmbedding, rnn):
     pickle.dump([[lParameters], [rParameters]], m)
 
 
+def loadModel(lParams):
+  """
+  If a model file is specified from a previous training example
+  load it to initialize the RNNED object
+
+  Parameters:
+    lParams : Language parameters (for santity check only)
+
+  Returns:
+    rParameters : The parameters of the RNNED model
+  """
+  lParameters = None
+  rParameters = None
+  # Read parameters from a pickled object
+  with open(opts.modelFile, "rb") as model:
+    [[lParameters], [rParameters]] = pickle.load(model)
+  #assert lParams == lParameters
+  return rParameters
+
+
 parser = argparse.ArgumentParser("Runs the RNN encoder-decoder training procedure for machine translation")
 parser.add_argument("-p", "--phrase-table", dest="phraseTable",
     default="/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.tiny.1.gz", help="The location of the phrase table")
@@ -216,6 +236,7 @@ parser.add_argument("-t", "--target-emb", dest="tEmbeddings",
     default="/export/a04/gkumar/code/custom/brae/tools/word2vec/fisher_en.vectors.50.sg.bin", help="Target embeddings obtained from word2vec")
 parser.add_argument("-o", "--outdir", dest="outDir", default="data/1.tiny", help="An output directory where the model is written")
 parser.add_argument("-b", "--batch-size", dest="bs", default=100, help="The batch size for SGD")
+parser.add_argument("-m", "--model", dest="modelFile", help="(Optional) A pre-trained RNN encoder-decoder model (Run train.py to obtain a model file)")
 opts = parser.parse_args()
 
 
@@ -226,7 +247,7 @@ s = {
   'nhidden':500, # Size of the hidden layer
   'seed':324, # Seed for the random number generator
   'emb_dimension':50, # The dimension of the embedding
-  'nepochs':1, # The number of epochs that training is to run for
+  'nepochs':25, # The number of epochs that training is to run for
   'prune_t':5000 # The frequency threshold for histogram pruning of the vocab
 }
 
@@ -258,8 +279,16 @@ train, dev = getPartitions(phrasePairs, s['seed'])
 tVocSize = len(t2idx)
 nTrainExamples = len(train)
 
+# RNNED Parameters from a pre-trained run
+rParameters = None
+# If specified, load pre-trained parameters for the RNNED
+if opts.modelFile is not None:
+  start = time.time()
+  rParameters = loadModel([s2idx, t2idx, sEmbeddings, tEmbeddings])
+  print "--- Done loading pickled parameters : ", time.time() - start, "s"
+
 start = time.time()
-rnn = rnned.RNNED(nh=s['nhidden'], nc=tVocSize, de=s['emb_dimension'])
+rnn = rnned.RNNED(nh=s['nhidden'], nc=tVocSize, de=s['emb_dimension'], model=rParameters)
 print "--- Done compiling theano functions : ", time.time() - start, "s"
 
 # Training

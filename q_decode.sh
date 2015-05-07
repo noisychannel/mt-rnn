@@ -6,19 +6,15 @@
 #$ -m eas
 #$ -l num_proc=1,h_vmem=30g,mem_free=30g,h_rt=120:00:00,gpu=1
 #$ -V
-#$ -j y -o log/decode.small.long.log
+#$ -j y -o log/decode.medium.2.log
 
 echo "Starting job on : " `hostname`
 echo "Started at : " `date`
 
 phraseTT=/export/a04/gkumar/experiments/MT-JHU/1/model/phrase-table.1.gz
 
-#model=data/1.tiny/best.mdl
-#outTT=data/1.tiny/phrase-table.1
-#model=data/1.small/best.mdl
-#outTT=data/1.small/phrase-table.1
-model=data/1.small.long/best.mdl
-outTT=data/1.small.long/phrase-table.1
+model=data/1.medium.2/best.mdl
+outTT=data/1.medium.2/phrase-table.1
 
 # Keep compiled files at the place where the job runs
 # Backoff to the default dir
